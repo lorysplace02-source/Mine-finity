@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Infinite Minesweeper</title>
+<style>
+  body {
+    margin: 0;
+    background: #0e0e0e;
+    color: #fff;
+    font-family: Arial, sans-serif;
+    overflow: hidden;
+  }
+
+  #game {
+    position: absolute;
+    inset: 0;
+    overflow: scroll;
+    background: #111;
+  }
+
+  #grid {
+    position: relative;
+    min-width: 100%;
+    min-height: 100%;
+  }
+
+  .cell {
+    position: absolute;
+    width: 32px;
+    height: 32px;
+    background: #1f1f1f; /* unrevealed tile */
+    border: 1px solid #2b2b2b;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    cursor: pointer;
+    user-select: none;
+    font-size: 18px;
+  }
+
+  .cell.revealed {
+    background: #9c9c9c; /* free revealed tiles */
+    cursor: default;
+    color: black;
+  }
+
+  .cell.flag {
+    background: #3a1f1f;
+    color: red;
+  }
+
+  .cell.mine {
+    background: #7a1f1f;
+  }
+</style>
+</head>
+<body>
+
+<div id="game">
+  <div id="grid"></div>
+</div>
+
+<script>
+const CELL_SIZE = 32;
+const VIEW_RADIUS = 60;
+const MINE_CHANCE = 0.15;
+
+const grid = document.getElementById("grid");
+const game = document.getElementById("game");
+
+const cells = new Map();
+
+function key(x, y) {
+  return `${x},${y}`;
+}
+
+function seededRandom(x, y) {
+  let n = x * 374761393 + y * 668265263;
+  n = (n ^ (n >> 13)) * 1274126177;
+  return ((n ^ (n >> 16)) >>> 0) / 4294967295;
+}
+
+function hasMine(x, y) {
+  return seededRandom(x, y) < MINE_CHANCE;
+}
+
+function countMines(x, y) {
+  let count = 0;
+  for (let dx = -1; dx <= 1; dx++) {
+    for (let dy = -1; dy <= 1; dy++) {
+      if (dx === 0 && dy === 0) continue;
+      if (hasMine(x + dx, y + dy)) count++;
+    }
+  }
+  return count;
+}
+
+function getNumberColor(number) {
+  switch(number){
+    case 1: return "#3518db";
+    case 2: return "#19c716";
+    case 3: return "#852d2d";
+    case 4: return "#421866";
+    case 5: return "#184c66";
+    case 6: return "#5ff5eb";
+    default: return "black";
+  }
+}
+
+function createCell(x, y) {
+  const div = document.createElement("div");
+  div.className = "cell";
+  div.style.left = `${x * CELL_SIZE}px`;
+  div.style.top = `${y * CELL_SIZE}px`;
+
+  div.oncontextmenu = e => {
+    e.preventDefault();
+    if (div.classList.contains("revealed")) return;
+    div.classList.toggle("flag");
+    div.textContent = div.classList.contains("flag") ? "🚩" : "";
+  };
+
+  div.onclick = () => reveal(x, y);
+
+  grid.appendChild(div);
+  cells.set(key(x, y), div);
+}
+
+function reveal(x, y) {
+  const k = key(x, y);
+  const cell = cells.get(k);
+  if (!cell || cell.classList.contains("revealed") || cell.classList.contains("flag")) return;
+
+  cell.classList.add("revealed");
+
+  if (hasMine(x, y)) {
+    cell.classList.add("mine");
+    cell.textContent = "💣";
+    return;
+  }
+
+  const mines = countMines(x, y);
+  if (mines > 0) {
+    cell.textContent = mines;
+    cell.style.color = getNumberColor(mines);
+    cell.style.background = "#c7c7c7"; // revealed numbered tiles
+  } else {
+    cell.textContent = "";
+    cell.style.background = "#9c9c9c"; // free revealed tiles
+    // reveal neighbors
+    for (let dx = -1; dx <= 1; dx++) {
+      for (let dy = -1; dy <= 1; dy++) {
+        if (dx || dy) reveal(x + dx, y + dy);
+      }
+    }
+  }
+}
+
+function updateVisibleCells() {
+  const cx = Math.floor(game.scrollLeft / CELL_SIZE);
+  const cy = Math.floor(game.scrollTop / CELL_SIZE);
+
+  for (let x = cx - VIEW_RADIUS; x < cx + VIEW_RADIUS; x++) {
+    for (let y = cy - VIEW_RADIUS; y < cy + VIEW_RADIUS; y++) {
+      const k = key(x, y);
+      if (!cells.has(k)) createCell(x, y);
+    }
+  }
+}
+
+game.addEventListener("scroll", updateVisibleCells);
+updateVisibleCells();
+</script>
+
+</body>
+</html>
